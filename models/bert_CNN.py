@@ -36,23 +36,33 @@ class Model(nn.Module):
 
     def __init__(self, config):
         super(Model, self).__init__()
+        #加载了一个预训练的 BERT 模型，并将其赋值给 self.bert 属性
         self.bert = BertModel.from_pretrained(config.bert_path)
+        #遍历了 BERT 模型的所有参数，并将它们的 requires_grad 属性设置为 True，因此训练过程中，这些参数的梯度会被计算和更新
         for param in self.bert.parameters():
             param.requires_grad = True
+        #创建一个 nn.ModuleList 对象，其中包含了一系列的二维卷积层。每个卷积层的输入通道数为1，输出通道数为 config.num_filters，卷积核的大小为 (k, config.hidden_size)，其中 k 是 config.filter_sizes 中的一个元素
         self.convs = nn.ModuleList(
             [nn.Conv2d(1, config.num_filters, (k, config.hidden_size)) for k in config.filter_sizes])
+        #创建Dropout 层
         self.dropout = nn.Dropout(config.dropout)
 
+        #创建全连接层
         self.fc_cnn = nn.Linear(config.num_filters * len(config.filter_sizes), config.num_classes)
 
     def conv_and_pool(self, x, conv):
         x = F.relu(conv(x)).squeeze(3)
         x = F.max_pool1d(x, x.size(2)).squeeze(2)
         return x
+    #x = F.avg_pool1d(x, x.size(2)).squeeze(2)
 
+    #模型的前向传播方法，接受一个参数 x（输入数据）。
+    context = x[0]  # 输入的句子
     def forward(self, x):
+        #取出句子的内容和掩码
         context = x[0]  # 输入的句子
         mask = x[2]  # 对padding部分进行mask，和句子一个size，padding部分用0表示，如：[1, 1, 1, 1, 0, 0]
+        #使用 BERT 模型对句子进行编码，同时传入注意力掩码以忽略填充的部分
         encoder_out, text_cls = self.bert(context, attention_mask=mask, output_all_encoded_layers=False)
         out = encoder_out.unsqueeze(1)
         out = torch.cat([self.conv_and_pool(out, conv) for conv in self.convs], 1)
