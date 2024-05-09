@@ -84,11 +84,15 @@ def train(config, model, train_iter, dev_iter, test_iter):
 
 
 def test(config, model, test_iter):
-    # test
+    # test config（配置信息），model（要测试的模型），和test_iter（测试数据迭代器）
     model.load_state_dict(torch.load(config.save_path))
+    #加载了之前训练好的模型权重。config.save_path 应该包含模型权重的文件路径，torch.load 用于从该路径加载权重，然后通过 model.load_state_dict 方法将加载的权重应用到 model 对象上
     model.eval()
+    #将模型设置为评估模式
     start_time = time.time()
+    #测试开始的时间
     test_acc, test_loss, test_report, test_confusion = evaluate(config, model, test_iter, test=True)
+    #创建了一个格式化字符串 msg，用于输出测试损失和准确率，并且以特定的格式打印出来。{0:>5.2} 表示第一个参数（即 test_loss）将被格式化为至少宽度为5的字符串，保留两位小数。{1:>6.2%} 表示第二个参数（即 test_acc）将被格式化为至少宽度为6的百分比字符串，保留两位小数
     msg = 'Test Loss: {0:>5.2},  Test Acc: {1:>6.2%}'
     print(msg.format(test_loss, test_acc))
     print("Precision, Recall and F1-Score...")
@@ -101,21 +105,30 @@ def test(config, model, test_iter):
 
 def evaluate(config, model, data_iter, test=False):
     model.eval()
+    #初始化了用于累计总损失、所有预测和所有真实标签的变量
     loss_total = 0
     predict_all = np.array([], dtype=int)
     labels_all = np.array([], dtype=int)
     with torch.no_grad():
+        #创建了一个上下文管理器，确保在其内部的代码块中，PyTorch 不会计算梯度
         for texts, labels in data_iter:
+            #遍历 data_iter 中的数据，每次迭代都会得到一批文本数据和对应的标签
+            #将当前批次的文本数据输入模型，得到模型的输出
             outputs = model(texts)
+            #算了当前批次的损失，使用的是交叉熵损失函数
             loss = F.cross_entropy(outputs, labels)
+            #将当前批次的损失加到总损失上
             loss_total += loss
             labels = labels.data.cpu().numpy()
             predic = torch.max(outputs.data, 1)[1].cpu().numpy()
+            #这两行代码将标签和预测结果从 PyTorch 张量转换为 NumPy 数组，并从 GPU（如果可用）移动到 CPU
             labels_all = np.append(labels_all, labels)
             predict_all = np.append(predict_all, predic)
 
+    #计算准确率
     acc = metrics.accuracy_score(labels_all, predict_all)
     if test:
+        #生成了分类报告和混淆矩阵，并将它们与准确率、平均损失一起返回
         report = metrics.classification_report(labels_all, predict_all, target_names=config.class_list, digits=4)
         confusion = metrics.confusion_matrix(labels_all, predict_all)
         return acc, loss_total / len(data_iter), report, confusion
