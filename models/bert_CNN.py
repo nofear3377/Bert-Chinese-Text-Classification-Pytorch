@@ -50,11 +50,13 @@ class Model(nn.Module):
         #创建全连接层
         self.fc_cnn = nn.Linear(config.num_filters * len(config.filter_sizes), config.num_classes)
 
+    #卷积层
     def conv_and_pool(self, x, conv):
         x = F.relu(conv(x)).squeeze(3)
+        #池化窗口的大小等于输入数据的长度x.size(2)，这样每个通道上的最大值就会被保留下来。.squeeze(2)的作用是去掉输出张量中大小为1的第三维，使得输出数据的维度变成[batch_size, channels]
         x = F.max_pool1d(x, x.size(2)).squeeze(2)
         return x
-    #x = F.avg_pool1d(x, x.size(2)).squeeze(2)
+    #平均池化：x = F.avg_pool1d(x, x.size(2)).squeeze(2)
 
     #模型的前向传播方法，接受一个参数 x（输入数据）。
     context = x[0]  # 输入的句子
